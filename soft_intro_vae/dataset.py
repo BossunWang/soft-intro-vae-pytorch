@@ -150,5 +150,31 @@ class DigitalMonstersDataset(data.Dataset):
 
 
 if __name__ == "__main__":
-    ds = DigitalMonstersDataset(root_path='./pokemon_ds')
-    print(ds)
+    # ds = DigitalMonstersDataset(root_path='./pokemon_ds')
+    # print(ds)
+
+    from torch.utils.data import DataLoader
+    from tqdm import tqdm
+    import matplotlib.pyplot as plt
+
+    def is_image_file(filename):
+        return any(filename.endswith(extension) for extension in [".jpg", ".png", ".jpeg", ".bmp"])
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    data_root = '../../celeba/celeba_arcface_aligned/images'
+    output_height = 128
+    image_list = [x for x in os.listdir(data_root) if is_image_file(x)]
+    train_set = ImageDatasetFromFile(image_list, data_root, input_height=None, crop_height=None,
+                                     output_height=output_height, is_mirror=True)
+
+    batch_size = 8
+    num_workers = 1
+    train_data_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True,
+                                   num_workers=num_workers)
+
+    pbar = tqdm(iterable=train_data_loader)
+
+    for batch in pbar:
+        real_batch = batch.to(device)
+        print(real_batch.size())
+        plt.imsave('sample_image.png', (real_batch[0].cpu().numpy().transpose(1, 2, 0)))
