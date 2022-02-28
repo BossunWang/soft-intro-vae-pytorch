@@ -533,6 +533,7 @@ def train_soft_intro_vae(dataset='cifar10', z_dim=128, lr_e=2e-4, lr_d=2e-4, bat
             # --------------train------------
             if dataset in ["cifar10", "svhn", "fmnist", "mnist"]:
                 batch = batch[0]
+            # vanilla vae training
             if epoch < num_vae:
                 if len(batch.size()) == 3:
                     batch = batch.unsqueeze(0)

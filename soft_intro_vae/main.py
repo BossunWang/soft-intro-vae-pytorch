@@ -21,7 +21,9 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--dataset", type=str,
                         help="dataset to train on: ['cifar10', 'mnist', 'fmnist', 'svhn', 'monsters128', 'celeb128', "
                              "'celeb256', 'celeb1024']")
+    parser.add_argument('--log_dir', default='logs', type=str, help='output directory')
     parser.add_argument("-n", "--num_epochs", type=int, help="total number of epochs to run", default=250)
+    parser.add_argument("--save_interval", type=int, default=50)
     parser.add_argument("-z", "--z_dim", type=int, help="latent dimensions", default=128)
     parser.add_argument("-l", "--lr", type=float, help="learning rate", default=2e-4)
     parser.add_argument("-b", "--batch_size", type=int, help="batch size", default=32)
@@ -47,6 +49,6 @@ if __name__ == "__main__":
     train_soft_intro_vae(dataset=args.dataset, z_dim=args.z_dim, batch_size=args.batch_size, num_workers=0,
                          num_epochs=args.num_epochs,
                          num_vae=args.num_vae, beta_kl=args.beta_kl, beta_neg=args.beta_neg, beta_rec=args.beta_rec,
-                         device=device, save_interval=50, start_epoch=0, lr_e=args.lr, lr_d=args.lr,
+                         device=device, save_interval=args.save_interval, start_epoch=0, lr_e=args.lr, lr_d=args.lr,
                          pretrained=pretrained, seed=args.seed,
-                         test_iter=1000, with_fid=args.fid)
+                         test_iter=1000, with_fid=args.fid, log_dir=args.log_dir)

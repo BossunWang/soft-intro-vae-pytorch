@@ -1,0 +1,12 @@
+CUDA_VISIBLE_DEVICES=1,0 python main.py \
+--dataset celeb112 \
+--device 0 \
+--lr 2e-4 \
+--num_epochs 150 \
+--save_interval 20 \
+--log_dir "logs" \
+--beta_kl 0.5 \
+--beta_rec 1.0 \
+--beta_neg 1024 \
+--z_dim 256 \
+--batch_size 16
