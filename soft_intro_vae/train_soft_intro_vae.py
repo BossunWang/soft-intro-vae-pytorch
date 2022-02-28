@@ -487,7 +487,7 @@ def train_soft_intro_vae(dataset='cifar10', z_dim=128, lr_e=2e-4, lr_d=2e-4, bat
         if with_fid and ((epoch == 0) or (epoch >= 100 and epoch % 20 == 0) or epoch == num_epochs - 1):
             with torch.no_grad():
                 print("calculating fid...")
-                fid = calculate_fid_given_dataset(train_data_loader, model, batch_size, cuda=True, dims=2048,
+                fid = calculate_fid_given_dataset(train_data_loader, model.module, batch_size, cuda=True, dims=2048,
                                                   device=device, num_images=50000)
                 print("fid:", fid)
                 if best_fid is None:
