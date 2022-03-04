@@ -22,7 +22,7 @@ import torch.nn.functional as F
 from torchvision.utils import make_grid
 from torchvision.datasets import CIFAR10, MNIST, FashionMNIST, SVHN
 from torchvision import transforms
-from torch.utils.tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
 
 # standard
 import os
@@ -102,7 +102,8 @@ class Encoder(nn.Module):
         sz = image_size // 2
         for ch in channels[1:]:
             self.main.add_module('res_in_{}'.format(sz), ResidualBlock(cc, ch, scale=1.0))
-            self.main.add_module('down_to_{}'.format(sz // 2), nn.AvgPool2d(2))
+            self.main.add_module('down_to_{}'.format(sz // 2), nn.Conv2d(ch, ch, 4, 2, 1),)
+            # self.main.add_module('down_to_{}'.format(sz // 2), nn.AvgPool2d(2))
             cc, sz = ch, sz // 2
 
         self.main.add_module('res_in_{}'.format(sz), ResidualBlock(cc, cc, scale=1.0))
@@ -431,7 +432,7 @@ def train_soft_intro_vae(dataset='cifar10', z_dim=128, lr_e=2e-4, lr_d=2e-4, bat
         image_size = 112
         ch = 3
         output_height = 112
-        data_root = '../../MS1M-V3/'
+        data_root = '/workspace/data/public/FR/MS-Celeb-1M/V3/MS1M-V3'
         image_list = []
         for dirs, subdirs, files in os.walk(data_root):
             for f in files:

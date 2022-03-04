@@ -15,7 +15,7 @@ import torch.nn.functional as F
 from torchvision.utils import make_grid
 from torchvision.datasets import CIFAR10, MNIST, FashionMNIST, SVHN
 from torchvision import transforms
-from torch.utils.tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
 
 # standard
 import os
@@ -397,6 +397,21 @@ def train_soft_intro_vae(dataset='cifar10', z_dim=128, lr_e=2e-4, lr_d=2e-4, bat
         output_height = 112
         data_root = '../../celeba/celeba_arcface_aligned/images'
         image_list = [x for x in os.listdir(data_root) if is_image_file(x)]
+        train_list = image_list
+        assert len(train_list) > 0
+        train_set = ImageDatasetFromFile(train_list, data_root, input_height=None, crop_height=None,
+                                         output_height=output_height, is_mirror=True)
+    elif dataset == 'ms1m_v3_112':
+        channels = [64, 128, 256, 512]
+        image_size = 112
+        ch = 3
+        output_height = 112
+        data_root = '/workspace/data/public/FR/MS-Celeb-1M/V3/MS1M-V3'
+        image_list = []
+        for dirs, subdirs, files in os.walk(data_root):
+            for f in files:
+                if is_image_file(f):
+                    image_list.append(os.path.join(dirs.split('/')[-1], f))
         train_list = image_list
         assert len(train_list) > 0
         train_set = ImageDatasetFromFile(train_list, data_root, input_height=None, crop_height=None,

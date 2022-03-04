@@ -23,6 +23,7 @@ if __name__ == "__main__":
     parser.add_argument('--log_dir', default='logs', type=str, help='the dir of logs')
     parser.add_argument("-n", "--num_epochs", type=int, help="total number of epochs to run", default=250)
     parser.add_argument("--save_interval", type=int, default=50)
+    parser.add_argument("--test_iter", type=int, default=50)
     parser.add_argument("-z", "--z_dim", type=int, help="latent dimensions", default=128)
     parser.add_argument("-l", "--lr", type=float, help="learning rate", default=2e-4)
     parser.add_argument("-b", "--batch_size", type=int, help="batch size", default=32)
@@ -52,4 +53,4 @@ if __name__ == "__main__":
                          num_vae=args.num_vae, beta_kl=args.beta_kl, beta_neg=args.beta_neg, beta_rec=args.beta_rec,
                          device=device, save_interval=args.save_interval, start_epoch=0, lr_e=args.lr, lr_d=args.lr,
                          pretrained=pretrained, seed=args.seed,
-                         test_iter=1000, with_fid=args.fid, log_dir=args.log_dir, gamma_r=args.gamma_r)
+                         test_iter=args.test_iter, with_fid=args.fid, log_dir=args.log_dir, gamma_r=args.gamma_r)

@@ -51,4 +51,4 @@ if __name__ == "__main__":
                          num_vae=args.num_vae, beta_kl=args.beta_kl, beta_neg=args.beta_neg, beta_rec=args.beta_rec,
                          device=device, save_interval=args.save_interval, start_epoch=0, lr_e=args.lr, lr_d=args.lr,
                          pretrained=pretrained, seed=args.seed,
-                         test_iter=1000, with_fid=args.fid, log_dir=args.log_dir)
+                         test_iter=1, with_fid=args.fid, log_dir=args.log_dir)
