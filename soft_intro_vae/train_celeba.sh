@@ -4,6 +4,7 @@ CUDA_VISIBLE_DEVICES=1,0 python main.py \
 --lr 2e-4 \
 --num_epochs 150 \
 --save_interval 20 \
+--test_iter 8000 \
 --log_dir "logs" \
 --beta_kl 0.5 \
 --beta_rec 1.0 \

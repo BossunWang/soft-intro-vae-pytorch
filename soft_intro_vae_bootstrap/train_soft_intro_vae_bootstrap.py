@@ -22,7 +22,8 @@ import torch.nn.functional as F
 from torchvision.utils import make_grid
 from torchvision.datasets import CIFAR10, MNIST, FashionMNIST, SVHN
 from torchvision import transforms
-from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
+# from tensorboardX import SummaryWriter
 
 # standard
 import os
@@ -130,6 +131,47 @@ class Encoder(nn.Module):
         return mu, logvar
 
 
+class View(nn.Module):
+    def __init__(self, size):
+        super(View, self).__init__()
+        self.size = size
+
+    def forward(self, tensor):
+        return tensor.view(self.size)
+
+
+class Encoder_idgan(nn.Module):
+    def __init__(self, cdim=3, zdim=512, infodistil_mode=False):
+        super(Encoder_idgan, self).__init__()
+        self.infodistil_mode = infodistil_mode
+        self.conv_layer = nn.Sequential(
+            nn.Conv2d(cdim, 32, 4, 2, 1),          # B,  32, 32, 32
+            nn.ReLU(True),
+            nn.Conv2d(32, 32, 4, 2, 1),          # B,  32, 16, 16
+            nn.ReLU(True),
+            nn.Conv2d(32, 64, 4, 2, 1),          # B,  64,  8,  8
+            nn.ReLU(True),
+            nn.Conv2d(64, 64, 4, 2, 1),          # B,  64,  4,  4
+            nn.ReLU(True),
+            nn.Conv2d(64, 256, 4, 1),            # B, 256,  1,  1
+            nn.ReLU(True)
+        )
+        self.fc_layer = nn.Linear(256 * 4 * 4, zdim * 2)
+
+    def forward(self, x):
+        if self.infodistil_mode:
+            x = x.add(1).div(2)
+            if (x.size(2) > 64) or (x.size(3) > 64):
+                x = F.adaptive_avg_pool2d(x, (64, 64))
+
+        batch_size = x.size(0)
+        h = self.conv_layer(x)
+        h = h.view(batch_size, -1)
+        h = self.fc_layer(h)
+        mu, logvar = h.chunk(2, dim=1)
+        return mu, logvar
+
+
 class Decoder(nn.Module):
     def __init__(self, cdim=3, zdim=512, channels=(64, 128, 256, 512, 512, 512), image_size=256, conditional=False,
                  conv_input_size=None, cond_dim=10):
@@ -177,6 +219,38 @@ class Decoder(nn.Module):
         return y
 
 
+class Decoder_idgan(nn.Module):
+    def __init__(self, cdim=3, zdim=512):
+        super(Decoder_idgan, self).__init__()
+        upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        self.layer = nn.Sequential(
+            nn.Linear(zdim, 256 * 7 * 7),  # B, 256
+            View((-1, 256, 7, 7)),               # B, 256,  7,  7
+            nn.ReLU(True),
+            upsample,
+            nn.Conv2d(256, 128, 1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(True),
+            upsample,
+            nn.Conv2d(128, 64, 1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(True),
+            upsample,
+            nn.Conv2d(64, 32, 1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(True),
+            nn.Conv2d(32, 16, 1),
+            nn.BatchNorm2d(16),
+            nn.ReLU(True),
+            upsample,
+            nn.Conv2d(16, cdim, 1)
+        )
+
+    def forward(self, c):
+        x = self.layer(c)
+        return x
+
+
 class SoftIntroVAE(nn.Module):
     def __init__(self, cdim=3, zdim=512, channels=(64, 128, 256, 512, 512, 512), image_size=256, conditional=False,
                  cond_dim=10):
@@ -194,6 +268,13 @@ class SoftIntroVAE(nn.Module):
         # create a target decoder - we do not train it
         self.target_decoder = Decoder(cdim, zdim, channels, image_size, conditional=conditional,
                                       conv_input_size=self.encoder.conv_output_size, cond_dim=cond_dim)
+
+        # self.encoder = Encoder_idgan(cdim, zdim)
+        #
+        # self.decoder = Decoder_idgan(cdim, zdim)
+        #
+        # # create a target decoder - we do not train it
+        # self.target_decoder = Decoder_idgan(cdim, zdim)
 
     def forward(self, x, o_cond=None, deterministic=False, target=True):
         if self.conditional and o_cond is not None:
