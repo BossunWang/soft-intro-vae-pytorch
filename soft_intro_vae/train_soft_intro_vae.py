@@ -15,8 +15,8 @@ import torch.nn.functional as F
 from torchvision.utils import make_grid
 from torchvision.datasets import CIFAR10, MNIST, FashionMNIST, SVHN
 from torchvision import transforms
-from torch.utils.tensorboard import SummaryWriter
-# from tensorboardX import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
 
 # standard
 import os
@@ -148,7 +148,7 @@ class Encoder_idgan(nn.Module):
             nn.Conv2d(64, 256, 4, 1),            # B, 256,  1,  1
             nn.ReLU(True)
         )
-        self.fc_layer = nn.Linear(256 * 4 * 4, zdim * 2)
+        self.fc_layer = nn.Linear(256 * 1 * 1, zdim * 2)
 
     def forward(self, x):
         if self.infodistil_mode:
@@ -216,8 +216,8 @@ class Decoder_idgan(nn.Module):
         super(Decoder_idgan, self).__init__()
         upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
         self.layer = nn.Sequential(
-            nn.Linear(zdim, 256 * 7 * 7),  # B, 256
-            View((-1, 256, 7, 7)),               # B, 256,  7,  7
+            nn.Linear(zdim, 256 * 4 * 4),  # B, 256
+            View((-1, 256, 4, 4)),               # B, 256,  7,  7
             nn.ReLU(True),
             upsample,
             nn.Conv2d(256, 128, 1),
@@ -252,14 +252,14 @@ class SoftIntroVAE(nn.Module):
         self.conditional = conditional
         self.cond_dim = cond_dim
 
-        self.encoder = Encoder_idgan(cdim, zdim)
-
-        self.decoder = Decoder_idgan(cdim, zdim)
-
-        # self.encoder = Encoder(cdim, zdim, channels, image_size, conditional=conditional, cond_dim=cond_dim)
+        # self.encoder = Encoder_idgan(cdim, zdim)
         #
-        # self.decoder = Decoder(cdim, zdim, channels, image_size, conditional=conditional,
-        #                        conv_input_size=self.encoder.conv_output_size, cond_dim=cond_dim)
+        # self.decoder = Decoder_idgan(cdim, zdim)
+
+        self.encoder = Encoder(cdim, zdim, channels, image_size, conditional=conditional, cond_dim=cond_dim)
+
+        self.decoder = Decoder(cdim, zdim, channels, image_size, conditional=conditional,
+                               conv_input_size=self.encoder.conv_output_size, cond_dim=cond_dim)
 
     def forward(self, x, o_cond=None, deterministic=False):
         if self.conditional and o_cond is not None:
@@ -398,7 +398,7 @@ def load_model(model, pretrained, device):
 
 def save_checkpoint(model, epoch, iteration, prefix=""):
     model_out_path = "./saves/" + prefix + "model_epoch_{}_iter_{}.pth".format(epoch, iteration)
-    state = {"epoch": epoch, "model": model.module.state_dict()}
+    state = {"epoch": epoch, "model": model.state_dict()}
     if not os.path.exists("./saves/"):
         os.makedirs("./saves/")
 
@@ -480,11 +480,11 @@ def train_soft_intro_vae(dataset='cifar10', z_dim=128, lr_e=2e-4, lr_d=2e-4, bat
         train_set = ImageDatasetFromFile(train_list, data_root, input_height=None, crop_height=None,
                                          output_height=output_height, is_mirror=True)
     elif dataset == 'ms1m_v3_112':
-        channels = [64, 128, 256, 512]
-        image_size = 112
+        channels = [64, 128, 256, 256]
+        image_size = 64
         ch = 3
-        output_height = 112
-        data_root = '../../MS1M-V3'
+        output_height = 64
+        data_root = '/workspace/data/public/FR/MS-Celeb-1M/V3/MS1M-V3'
         image_list = []
         for dirs, subdirs, files in os.walk(data_root):
             for f in files:
@@ -499,10 +499,10 @@ def train_soft_intro_vae(dataset='cifar10', z_dim=128, lr_e=2e-4, lr_d=2e-4, bat
         image_size = 256
         ch = 3
         output_height = 256
-        train_size = 162770
-        data_root = '../data/celeb256/img_align_celeba'
+        # train_size = 162770
+        data_root = '../../face_dataset/CelebAMask-HQ/CelebA-HQ-img'
         image_list = [x for x in os.listdir(data_root) if is_image_file(x)]
-        train_list = image_list[:train_size]
+        train_list = image_list
         assert len(train_list) > 0
         train_set = ImageDatasetFromFile(train_list, data_root, input_height=None, crop_height=None,
                                          output_height=output_height, is_mirror=True)
@@ -546,7 +546,7 @@ def train_soft_intro_vae(dataset='cifar10', z_dim=128, lr_e=2e-4, lr_d=2e-4, bat
     model = SoftIntroVAE(cdim=ch, zdim=z_dim, channels=channels, image_size=image_size).to(device)
     if pretrained is not None:
         load_model(model, pretrained, device)
-    print(model)
+    # print(model)
 
     fig_dir = './figures_' + dataset
     os.makedirs(fig_dir, exist_ok=True)
@@ -558,8 +558,6 @@ def train_soft_intro_vae(dataset='cifar10', z_dim=128, lr_e=2e-4, lr_d=2e-4, bat
 
     e_scheduler = optim.lr_scheduler.MultiStepLR(optimizer_e, milestones=(350,), gamma=0.1)
     d_scheduler = optim.lr_scheduler.MultiStepLR(optimizer_d, milestones=(350,), gamma=0.1)
-
-    model = nn.DataParallel(model)
 
     scale = 1 / (ch * image_size ** 2)  # normalize by images size (channels * height * width)
 
@@ -580,7 +578,7 @@ def train_soft_intro_vae(dataset='cifar10', z_dim=128, lr_e=2e-4, lr_d=2e-4, bat
         if with_fid and ((epoch == 0) or (epoch >= 100 and epoch % 20 == 0) or epoch == num_epochs - 1):
             with torch.no_grad():
                 print("calculating fid...")
-                fid = calculate_fid_given_dataset(train_data_loader, model.module, batch_size, cuda=True, dims=2048,
+                fid = calculate_fid_given_dataset(train_data_loader, model, batch_size, cuda=True, dims=2048,
                                                   device=device, num_images=50000)
                 print("fid:", fid)
                 if best_fid is None:
@@ -662,18 +660,18 @@ def train_soft_intro_vae(dataset='cifar10', z_dim=128, lr_e=2e-4, lr_d=2e-4, bat
                 real_batch = batch.to(device)
 
                 # =========== Update E ================
-                for param in model.module.encoder.parameters():
+                for param in model.encoder.parameters():
                     param.requires_grad = True
-                for param in model.module.decoder.parameters():
+                for param in model.decoder.parameters():
                     param.requires_grad = False
 
                 # generate 'fake' data
-                fake = model.module.sample(noise_batch)
+                fake = model.sample(noise_batch)
 
                 # ELBO for real data
-                real_mu, real_logvar = model.module.encode(real_batch)
+                real_mu, real_logvar = model.encode(real_batch)
                 z = reparameterize(real_mu, real_logvar)
-                rec = model.module.decoder(z)
+                rec = model.decoder(z)
 
                 lossE_real_rec = calc_reconstruction_loss(real_batch, rec, loss_type=recon_loss_type, reduction="mean")
 
@@ -711,27 +709,27 @@ def train_soft_intro_vae(dataset='cifar10', z_dim=128, lr_e=2e-4, lr_d=2e-4, bat
                 optimizer_e.step()
 
                 # ========= Update D ==================
-                for param in model.module.encoder.parameters():
+                for param in model.encoder.parameters():
                     param.requires_grad = False
-                for param in model.module.decoder.parameters():
+                for param in model.decoder.parameters():
                     param.requires_grad = True
 
                 # generate 'fake' data
-                fake = model.module.sample(noise_batch)
-                rec = model.module.decoder(z.detach())
+                fake = model.sample(noise_batch)
+                rec = model.decoder(z.detach())
 
                 # ELBO loss for real -- just the reconstruction, KLD for real doesn't affect the decoder
                 lossD_rec = calc_reconstruction_loss(real_batch, rec, loss_type=recon_loss_type, reduction="mean")
 
                 # prepare 'fake' data for the ELBO
-                rec_mu, rec_logvar = model.module.encode(rec)
+                rec_mu, rec_logvar = model.encode(rec)
                 z_rec = reparameterize(rec_mu, rec_logvar)
 
-                fake_mu, fake_logvar = model.module.encode(fake)
+                fake_mu, fake_logvar = model.encode(fake)
                 z_fake = reparameterize(fake_mu, fake_logvar)
 
-                rec_rec = model.module.decode(z_rec.detach())
-                rec_fake = model.module.decode(z_fake.detach())
+                rec_rec = model.decode(z_rec.detach())
+                rec_fake = model.decode(z_fake.detach())
 
                 lossD_rec_rec = calc_reconstruction_loss(rec.detach(), rec_rec, loss_type=recon_loss_type,
                                                         reduction="mean")
@@ -741,9 +739,8 @@ def train_soft_intro_vae(dataset='cifar10', z_dim=128, lr_e=2e-4, lr_d=2e-4, bat
                 lossD_rec_kl = calc_kl(rec_logvar, rec_mu, reduce="mean")
                 lossD_fake_kl = calc_kl(fake_logvar, fake_mu, reduce="mean")
 
-                lossD = scale * (lossD_rec * beta_rec + (
-                        lossD_rec_kl + lossD_fake_kl) * 0.5 * beta_kl + gamma_r * 0.5 * beta_rec * (
-                                         lossD_rec_rec + lossD_fake_rec))
+                lossD = scale * (lossD_rec * beta_rec + (lossD_rec_kl + lossD_fake_kl) * 0.5 * beta_kl
+                                 + gamma_r * 0.5 * beta_rec * (lossD_rec_rec + lossD_fake_rec))
 
                 optimizer_d.zero_grad()
                 lossD.backward()
@@ -784,6 +781,7 @@ def train_soft_intro_vae(dataset='cifar10', z_dim=128, lr_e=2e-4, lr_d=2e-4, bat
                     writer.add_scalar('soft_intro_vae/lossD_fake_rec', lossD_fake_rec.data.cpu().item(), cur_iter)
                     writer.add_scalar('soft_intro_vae/lossD_rec_kl', lossD_rec_kl.data.cpu().item(), cur_iter)
                     writer.add_scalar('soft_intro_vae/lossD_fake_kl', lossD_fake_kl.data.cpu().item(), cur_iter)
+                    writer.add_scalar('soft_intro_vae/dif_kl', dif_kl.item(), cur_iter)
 
                     _, _, _, rec_det = model(real_batch, deterministic=True)
                     max_imgs = min(batch.size(0), 16)
@@ -826,7 +824,7 @@ def train_soft_intro_vae(dataset='cifar10', z_dim=128, lr_e=2e-4, lr_d=2e-4, bat
             with torch.no_grad():
                 _, _, _, rec_det = model(real_batch, deterministic=True)
                 noise_batch = torch.randn(size=(b_size, z_dim)).to(device)
-                fake = model.module.sample(noise_batch)
+                fake = model.sample(noise_batch)
                 max_imgs = min(batch.size(0), 16)
                 vutils.save_image(
                     torch.cat([real_batch[:max_imgs], rec_det[:max_imgs], fake[:max_imgs]], dim=0).data.cpu(),
