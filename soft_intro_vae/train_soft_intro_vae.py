@@ -494,6 +494,22 @@ def train_soft_intro_vae(dataset='cifar10', z_dim=128, lr_e=2e-4, lr_d=2e-4, bat
         assert len(train_list) > 0
         train_set = ImageDatasetFromFile(train_list, data_root, input_height=None, crop_height=None,
                                          output_height=output_height, is_mirror=True)
+
+    elif dataset == 'ms1m_v3_mask':
+        channels = [64, 128, 256, 256]
+        image_size = 64
+        ch = 3
+        output_height = 64
+        data_root = '/workspace/data/public/FR/MS-Celeb-1M/V3/MS1M-V3_FMA_mask'
+        image_list = []
+        for dirs, subdirs, files in os.walk(data_root):
+            for f in files:
+                if is_image_file(f):
+                    image_list.append(os.path.join(dirs.split('/')[-1], f))
+        train_list = image_list
+        assert len(train_list) > 0
+        train_set = ImageDatasetFromFile(train_list, data_root, input_height=None, crop_height=None,
+                                         output_height=output_height, is_mirror=True)
     elif dataset == 'celeb256':
         channels = [64, 128, 256, 512, 512, 512]
         image_size = 256
